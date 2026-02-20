@@ -15,15 +15,15 @@ public class ETLPipeline {
         String inputFile = "data/products.csv";
         String outputFile = "data/transformed_products.csv";
 
-        int rowsRead = 0;        // non-header lines encountered (includes bad ones)
-        int rowsTransformed = 0; // valid rows written
-        int rowsSkipped = 0;     // invalid/blank rows skipped
+        int rowsRead = 0;        // non-header lines encountered (including bad ones)
+        int rowsSkipped = 0;     // bad/blank/wrong-format lines
+        int rowsTransformed = 0; // lines written to output
 
-        // Missing file case (must exit cleanly)
+        // 1) Missing file case
         File f = new File(inputFile);
         if (!f.exists()) {
-            System.out.println("ERROR: Missing input file (data/products.csv).");
-            return;
+            System.out.println("ERROR: Missing input file: " + inputFile);
+            return; // exit cleanly (no stack trace)
         }
 
         BufferedReader br = null;
@@ -37,43 +37,44 @@ public class ETLPipeline {
             bw.write("ProductID,Name,Price,Category,PriceRange");
             bw.newLine();
 
-            // Read input header (do not transform)
+            // Read header from input (do not transform)
             String header = br.readLine();
 
-            // Empty input file (no lines at all)
+            // If file is totally empty (no header at all), we still created output with header above
             if (header == null) {
-                // Output already has header row
                 printSummary(rowsRead, rowsTransformed, rowsSkipped, outputFile);
+                closeQuietly(br, bw);
                 return;
             }
 
+            // Read each non-header line
             String line;
             while ((line = br.readLine()) != null) {
                 rowsRead++;
 
-                // Skip blank lines
+                // skip blank line
                 if (line.trim().isEmpty()) {
                     rowsSkipped++;
                     continue;
                 }
 
-                // Split and validate field count
+                // split and validate field count
                 String[] parts = line.split(",");
                 if (parts.length != 4) {
                     rowsSkipped++;
                     continue;
                 }
 
-                // Trim each field
+                // trim each field
                 String idStr = parts[0].trim();
                 String name = parts[1].trim();
                 String priceStr = parts[2].trim();
                 String category = parts[3].trim();
 
+                // parse ProductID and Price
                 int productId;
                 BigDecimal price;
 
-                // Parse ProductID + Price (skip row if bad)
                 try {
                     productId = Integer.parseInt(idStr);
                     price = new BigDecimal(priceStr);
@@ -83,16 +84,16 @@ public class ETLPipeline {
                 }
 
                 // ----------------------------
-                // TRANSFORM (exact order)
+                // 2) TRANSFORM (exact order)
                 // ----------------------------
 
-                // 1) Name to UPPERCASE
+                // (1) name to UPPERCASE
                 name = name.toUpperCase();
 
-                // Save original category check
+                // Track original category = Electronics before any changes
                 boolean originalWasElectronics = category.equals("Electronics");
 
-                // 2) If Electronics, apply 10% discount
+                // (2) 10% discount if category is Electronics
                 if (originalWasElectronics) {
                     price = price.multiply(new BigDecimal("0.90"));
                 }
@@ -100,12 +101,12 @@ public class ETLPipeline {
                 // Round HALF_UP to exactly 2 decimals
                 price = price.setScale(2, RoundingMode.HALF_UP);
 
-                // 3) Premium Electronics rule (uses final rounded price + original category)
+                // (3) Premium Electronics rule (uses final rounded price + original category)
                 if (originalWasElectronics && price.compareTo(new BigDecimal("500.00")) > 0) {
                     category = "Premium Electronics";
                 }
 
-                // 4) PriceRange based on final rounded price
+                // (4) PriceRange based on final rounded price
                 String priceRange;
                 if (price.compareTo(new BigDecimal("10.00")) <= 0) {
                     priceRange = "Low";
@@ -118,29 +119,27 @@ public class ETLPipeline {
                 }
 
                 // ----------------------------
-                // LOAD (write to output)
+                // 3) LOAD (write output row)
                 // ----------------------------
+
+                // price.toPlainString() will keep "500.40" etc exactly, and setScale ensures 2 decimals
                 bw.write(productId + "," + name + "," + price.toPlainString() + "," + category + "," + priceRange);
                 bw.newLine();
 
                 rowsTransformed++;
             }
 
+            // done writing
             bw.flush();
 
         } catch (IOException e) {
             System.out.println("ERROR: Could not read/write files.");
-            return;
+            // exit cleanly
         } finally {
-            try {
-                if (br != null) br.close();
-            } catch (IOException ignored) {}
-
-            try {
-                if (bw != null) bw.close();
-            } catch (IOException ignored) {}
+            closeQuietly(br, bw);
         }
 
+        // Run summary
         printSummary(rowsRead, rowsTransformed, rowsSkipped, outputFile);
     }
 
@@ -150,5 +149,14 @@ public class ETLPipeline {
         System.out.println("Number of rows skipped: " + skipped);
         System.out.println("Output file path written: " + outputFile);
     }
-}
 
+    private static void closeQuietly(BufferedReader br, BufferedWriter bw) {
+        try {
+            if (br != null) br.close();
+        } catch (IOException ignored) {}
+
+        try {
+            if (bw != null) bw.close();
+        } catch (IOException ignored) {}
+    }
+}
