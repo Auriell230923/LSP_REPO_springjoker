@@ -5,4 +5,4 @@ I used it mainly for:
 - Writing and organizing the methods correctly
 - Adding comments to better understand the code
 
-No external websites were used.
+No external websites were used. I also drafted JUnit tests but my local environment was not configured for JUnit 5 execution.
