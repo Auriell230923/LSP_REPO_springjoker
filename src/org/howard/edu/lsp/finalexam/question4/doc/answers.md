@@ -1,0 +1,3 @@
+At the beginning of the semester, I mostly saw AI as a way to quickly get answers. But over time, my perspective changed. I realized that AI is more useful as a tool to help me understand concepts, debug code, and guide my thinking instead of just giving me solutions.
+
+In the future, I plan to use AI to help me when I get stuck, especially for debugging and learning new topics. I will still make sure I understand my code and can explain it, because that’s important for actually learning and doing well in programming.
